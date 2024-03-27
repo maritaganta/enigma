@@ -82,12 +82,24 @@ def contouring(frame):
     contours, _ = cv2.findContours(frame, 
                                    cv2.RETR_EXTERNAL, 
                                    cv2.CHAIN_APPROX_NONE) 
+    if len(contours):
+        cnt = contours[0]
+        cnt_img = frame.copy()
+        cnt_img = cv2.cvtColor(cnt_img, cv2.COLOR_GRAY2RGB)
+
+        # TODO: Observe how the eclipse fits well when in line, but not well on curve
+        #       The eclipse can tell us where to use optical flow and polynomial
+        ellipse = cv2.fitEllipse(cnt)
+        cv2.ellipse(cnt_img,ellipse,(0,255,0),2)
+        cv2.imshow('Contour Features', cnt_img)
     
     return contours
 
 
-def objective(x, a, b, c, d, e, f):
-    return (a * x) + (b * x**2) + (c * x**3) + (d * x**4) + (e * x**5) + f
+def objective(x, a, b, c):
+    # TODO: Evaluate performance of each line
+    # https://machinelearningmastery.com/curve-fitting-with-python/
+    return a * x + b * x**2 + c
 
 def fit_curve(frame, cnts):
 
@@ -96,22 +108,28 @@ def fit_curve(frame, cnts):
 
         x_values =[]
         y_values = []
+        min_x = frame.shape[1]//2
+        max_x = 0
         for point in cnt:
             x = point[0][0]
             y = point[0][1]
+            if x < min_x:
+                min_x = x
+            if x > max_x:
+                max_x = x
             if x != 0 and y !=0 and x!=479 and y!=479:
                 x_values.append(point[0][0])
                 y_values.append(point[0][1])
                 cv2.circle(frame, (x,y), 1, (0,0,255), 2)
+        cv2.circle(frame, (min_x, 0), 1, (255, 0, 0), 5)
+        cv2.circle(frame, (max_x, 0), 1, (0, 255, 0), 5)
 
         popt, _ = curve_fit(objective, x_values, y_values)
+        a, b, c = popt
 
-        a, b, c, d, e, f = popt
+        x_line = np.arange(min_x, max_x, 1)
+        y_line = objective(x_line, a, b, c)
 
-        x_line = np.arange(0, frame.shape[0], 1)
-        y_line = objective(x_line, a, b, c, d, e, f)
-
-        # TODO: Ensure the y_line is being parsed properly in higher order polynomial (values within image bounds)
         for i, element in enumerate(x_line):
             cv2.circle(frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
 
