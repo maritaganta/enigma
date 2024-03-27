@@ -23,18 +23,15 @@ def read_video(video_path, q3d=False, optical_flow=False):
 
         if ret:
 
-            try:
+            if current_frame is not None:
                 prev_frame = current_frame
-            except:
-                pass
             current_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
             cv2.circle(frame, (frame.shape[1]//2, frame.shape[0]//2), 1, (0,0,255), 2)
             cv2.imshow('Playback Video', frame)
 
             if q3d:
-
-                frame = preprocess(frame)
+                frame = preprocess(current_frame)
                 frame = crop_square(frame)
                 cnts = contouring(frame)
 
@@ -44,10 +41,10 @@ def read_video(video_path, q3d=False, optical_flow=False):
                 cv2.imshow('Contour Overlay', frame)
 
             if optical_flow:
-                try:
+                if prev_frame is not None:
                     flow_img, move, core_flow = Opticalflow.analyse(prev_frame, current_frame)
-                except:
-                    pass
+                    width_rgb, width = measure_width(move, core_flow, prev_frame)
+
 
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 break
@@ -65,8 +62,7 @@ def preprocess(frame):
     return frame
 
 
-
-def crop_square(frame, size=(480,480)):
+def crop_square(frame, size=(200,200)):
 
     w, h = frame.shape
     center = (h//2, w//2)
@@ -121,34 +117,26 @@ def fit_curve(frame, cnts):
 
 
 class Opticalflow:
-    def draw_flow(rgb_prev, rgb_nxt):
+    def draw_flow(rgb_prev, rgb_nxt, viz=False):
         THRESHOLD_DETECT = 20
         THRESHOLD_IGNORE_L = 1
         THRESHOLD_IGNORE_H = 300
         MOVE = [0, 0]
         COUNT_MOVE = 1
         STEP = 20
-        # generate grids
+
         h, w = rgb_prev.shape[:2]
         y, x = np.mgrid[STEP / 2 : h : STEP, STEP / 2 : w : STEP].reshape(2, -1).astype(int)
         fx, fy = rgb_nxt[y, x].T
-
         angle = np.arctan2(fy, fx)
 
-        # clustering
         cluster_lables = DBSCAN(eps=0.01, min_samples=2).fit(angle.reshape(-1, 1))
         core_cluster = angle[cluster_lables != -1]
         core_flow = np.mean(core_cluster, axis=1)
 
         lines = np.vstack([x, y, x + fx, y + fy]).T.reshape(-1, 2, 2)
         lines = np.int32(lines + 0.5)
-        vis = cv2.cvtColor(rgb_prev, cv2.COLOR_GRAY2BGR)
 
-        for (x1, y1), (_x2, _y2) in lines:
-            if not x1 == _x2 and not y1 == _y2:
-                cv2.arrowedLine(vis, (x1, y1), (_x2, _y2), (0, 0, 255), 1, tipLength=0.3)
-
-        # calculate move
         vx = vy = 0
         for i in range(len(lines)):
             vect_x = lines[i][1][0] - lines[i][0][0]
@@ -160,14 +148,19 @@ class Opticalflow:
                 vx += vect_x
                 vy += vect_y
                 COUNT_MOVE += 1
-
         MOVE[0] = vx
         MOVE[1] = vy
 
         if not abs(MOVE[0]) >= THRESHOLD_DETECT or not abs(MOVE[1]) >= THRESHOLD_DETECT:
             MOVE = [0, 0]
 
-        cv2.imshow('Optical flow', vis)
+        if viz:
+            vis = cv2.cvtColor(rgb_prev, cv2.COLOR_GRAY2BGR)
+            for (x1, y1), (_x2, _y2) in lines:
+                if not x1 == _x2 and not y1 == _y2:
+                    cv2.arrowedLine(vis, (x1, y1), (_x2, _y2), (0, 0, 255), 1, tipLength=0.3)
+            cv2.imshow('Optical Flow Overlay', vis)
+
         return vis, MOVE, core_flow
 
     def analyse(pre_img, nxt_img):
@@ -193,46 +186,48 @@ class Opticalflow:
             poly_sigma,
             flags,
         )
-
         return Opticalflow.draw_flow(nxt_gray, rgb_nxt)
-    
-    @staticmethod
-    def measure_width(move, angle, depth_img):
-        rad = angle
-        width, height = depth_img.shape
-        centerPt = (height / 2, width / 2)
-        if not move[1] == 0 or not move[0] == 0:
-            M = cv2.getRotationMatrix2D(centerPt, degrees(rad), 1)
-            rot_img = cv2.warpAffine(depth_img, M, (height, width))
-            indices = np.indices(rot_img.shape)
-            rows = indices[0][rot_img > 0]
-            cols = indices[1][rot_img > 0]
-            retraction = 0
-            # find the rightmost point
-            if not rows.size == 0 and not cols.size == 0:
-                measure_col = int(centerPt[1]) + retraction
-                slice_width = np.nonzero(rot_img[:, measure_col])
-                if not slice_width[0].size == 0:
-                    start_of_layer = slice_width[0].min()
-                    end_of_layer = start_of_layer
-                    while end_of_layer + 1 in slice_width[0]:
-                        end_of_layer += 1
 
-                    width = end_of_layer - start_of_layer
 
-                    depth_rgb = cv2.cvtColor(rot_img, cv2.COLOR_GRAY2BGR)
+def measure_width(move, core_flow, rgb_prev, viz=False):
+    # TODO: Horrible Results - fix
+    rad = core_flow[0]
+    width, height = rgb_prev.shape
+    centerPt = (height / 2, width / 2)
+    if not move[1] == 0 or not move[0] == 0:
+        M = cv2.getRotationMatrix2D(centerPt, np.degrees(rad), 1)
+        rot_img = cv2.warpAffine(rgb_prev, M, (height, width))
+        indices = np.indices(rot_img.shape)
+        rows = indices[0][rot_img > 0]
+        cols = indices[1][rot_img > 0]
+        retraction = 0
+        # find the rightmost point
+        if not rows.size == 0 and not cols.size == 0:
+            measure_col = int(centerPt[1]) + retraction
+            slice_width = np.nonzero(rot_img[:, measure_col])
+            if not slice_width[0].size == 0:
+                start_of_layer = slice_width[0].min()
+                end_of_layer = start_of_layer
+                while end_of_layer + 1 in slice_width[0]:
+                    end_of_layer += 1
+
+                width = end_of_layer - start_of_layer
+
+                if viz:
+                    width_rgb = cv2.cvtColor(rot_img, cv2.COLOR_GRAY2BGR)
                     cv2.arrowedLine(
-                        depth_rgb,
+                        width_rgb,
                         (measure_col, start_of_layer),
                         (measure_col, end_of_layer),
                         (0, 0, 255),
                         2,
                     )
-                    return depth_rgb, width
-        return np.zeros_like(depth_img), None
+                    cv2.imshow('Visualise Width Vector', width_rgb)
+                return rot_img, width
+    return np.zeros_like(rgb_prev), None
 
 
-read_video(video_path, q3d=False, optical_flow=True)
+read_video(video_path, q3d=True, optical_flow=False)
 
 
 
