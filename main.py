@@ -62,7 +62,7 @@ def preprocess(frame):
     return frame
 
 
-def crop_square(frame, size=(200,200)):
+def crop_square(frame, size=(480,480)):
 
     w, h = frame.shape
     center = (h//2, w//2)
@@ -86,8 +86,8 @@ def contouring(frame):
     return contours
 
 
-def objective(x, a, b, c, d):
-    return a * np.sin(b - x) + c * x**2 + d
+def objective(x, a, b, c, d, e, f):
+    return (a * x) + (b * x**2) + (c * x**3) + (d * x**4) + (e * x**5) + f
 
 def fit_curve(frame, cnts):
 
@@ -106,15 +106,14 @@ def fit_curve(frame, cnts):
 
         popt, _ = curve_fit(objective, x_values, y_values)
 
-        a, b, c, d = popt
+        a, b, c, d, e, f = popt
 
         x_line = np.arange(0, frame.shape[0], 1)
-        y_line = objective(x_line, a, b, c, d)
+        y_line = objective(x_line, a, b, c, d, e, f)
 
         # TODO: Ensure the y_line is being parsed properly in higher order polynomial (values within image bounds)
         for i, element in enumerate(x_line):
             cv2.circle(frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
-
 
 class Opticalflow:
     def draw_flow(rgb_prev, rgb_nxt, viz=False):
