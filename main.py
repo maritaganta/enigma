@@ -32,7 +32,6 @@ def read_video(video_path, q3d=False, optical_flow=False):
 
             if q3d:
                 frame = preprocess(current_frame)
-                frame = crop_square(frame)
                 cnts = contouring(frame)
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
@@ -56,13 +55,9 @@ def read_video(video_path, q3d=False, optical_flow=False):
     cv2.destroyAllWindows()
 
 
-def preprocess(frame):
+def preprocess(frame, size=(480,480)):
     _, frame = cv2.threshold(frame, 127, 255, cv2.THRESH_BINARY)
     frame = cv2.bitwise_not(frame)
-    return frame
-
-
-def crop_square(frame, size=(480,480)):
 
     w, h = frame.shape
     center = (h//2, w//2)
@@ -78,21 +73,22 @@ def crop_square(frame, size=(480,480)):
     return cropped_frame
 
 
-def contouring(frame):
+def contouring(frame, ellipse=False):
     contours, _ = cv2.findContours(frame, 
                                    cv2.RETR_EXTERNAL, 
                                    cv2.CHAIN_APPROX_NONE) 
-    if len(contours):
-        cnt = contours[0]
-        cnt_img = frame.copy()
-        cnt_img = cv2.cvtColor(cnt_img, cv2.COLOR_GRAY2RGB)
+    if ellipse:
+        if len(contours):
+            cnt = contours[0]
+            cnt_img = frame.copy()
+            cnt_img = cv2.cvtColor(cnt_img, cv2.COLOR_GRAY2RGB)
 
-        # TODO: Observe how the eclipse fits well when in line, but not well on curve
-        #       The eclipse can tell us where to use optical flow and polynomial
-        ellipse = cv2.fitEllipse(cnt)
-        cv2.ellipse(cnt_img,ellipse,(0,255,0),2)
-        cv2.imshow('Contour Features', cnt_img)
-    
+            # TODO: Observe how the eclipse fits well when in line, but not well on curve
+            #       The eclipse can tell us where to use optical flow and polynomial
+            ellipse = cv2.fitEllipse(cnt)
+            cv2.ellipse(cnt_img,ellipse,(0,255,0),2)
+            cv2.imshow('Contour Features', cnt_img)
+        
     return contours
 
 
@@ -127,10 +123,11 @@ def fit_curve(frame, cnts):
         popt, _ = curve_fit(objective, x_values, y_values)
         a, b, c = popt
 
-        x_line = np.arange(min_x, max_x, 1)
+        x_line = np.arange(min_x+(min_x+max_x)//2, max_x, 1)
         y_line = objective(x_line, a, b, c)
 
         for i, element in enumerate(x_line):
+            cv2.circle(frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
             cv2.circle(frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
 
 class Opticalflow:
