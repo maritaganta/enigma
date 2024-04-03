@@ -5,7 +5,7 @@ from sklearn.cluster import DBSCAN
 
 
 
-video_path = 'data/animation_2.mp4'
+video_path = 'data/sinusoidal_move_phase.mp4'
 
 def read_video(video_path, q3d=False, optical_flow=False):
     
@@ -116,7 +116,7 @@ def fit_curve(frame, cnts):
             if x != 0 and y !=0 and x!=479 and y!=479:
                 x_values.append(point[0][0])
                 y_values.append(point[0][1])
-                cv2.circle(frame, (x,y), 1, (0,0,255), 2)
+                #cv2.circle(frame, (x,y), 1, (0,0,255), 2)
         cv2.circle(frame, (min_x, 0), 1, (255, 0, 0), 5)
         cv2.circle(frame, (max_x, 0), 1, (0, 255, 0), 5)
 
@@ -127,7 +127,6 @@ def fit_curve(frame, cnts):
         y_line = objective(x_line, a, b, c)
 
         for i, element in enumerate(x_line):
-            cv2.circle(frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
             cv2.circle(frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
 
 class Opticalflow:
