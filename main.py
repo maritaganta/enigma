@@ -33,11 +33,11 @@ def read_video(video_path, q3d=False, optical_flow=False):
             if q3d:
                 frame = preprocess(current_frame)
                 cnts = contouring(frame)
-
-                frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
-                fit_curve(frame, cnts)
-                #cv2.drawContours(frame, cnts, -1, (0, 255, 0), 3)
-                cv2.imshow('Contour Overlay', frame)
+                line_frame = fit_curve(frame, cnts)
+                try:
+                    cv2.imshow('Contour Overlay', line_frame)
+                except:
+                    pass
 
             if optical_flow:
                 if prev_frame is not None:
@@ -104,30 +104,32 @@ def fit_curve(frame, cnts):
 
         x_values =[]
         y_values = []
-        min_x = frame.shape[1]//2
+        min_x = frame.shape[1]  # initialize the min and max x to the other end of the range
         max_x = 0
         for point in cnt:
             x = point[0][0]
             y = point[0][1]
             if x < min_x:
-                min_x = x
+                min_x = x # min x value in the frame
             if x > max_x:
-                max_x = x
-            if x != 0 and y !=0 and x!=479 and y!=479:
+                max_x = x # max x value in the frame
+            if x != 0 and y !=0 and x!=479 and y!=479: # TODO: improve into ranges to not get x/y values close to the edges
                 x_values.append(point[0][0])
                 y_values.append(point[0][1])
-                #cv2.circle(frame, (x,y), 1, (0,0,255), 2)
-        cv2.circle(frame, (min_x, 0), 1, (255, 0, 0), 5)
-        cv2.circle(frame, (max_x, 0), 1, (0, 255, 0), 5)
 
         popt, _ = curve_fit(objective, x_values, y_values)
         a, b, c = popt
 
-        x_line = np.arange(min_x+(min_x+max_x)//2, max_x, 1)
+        margin_x = 0 # adjust according to how further from min x do we start fitting - useful in the case of long curves 
+
+        x_line = np.arange(min_x + margin_x, max_x, 1)
         y_line = objective(x_line, a, b, c)
 
-        for i, element in enumerate(x_line):
-            cv2.circle(frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
+        line_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+        for i in range((x_line.shape[0])):
+            cv2.circle(line_frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
+
+        return line_frame
 
 class Opticalflow:
     def draw_flow(rgb_prev, rgb_nxt, viz=False):
