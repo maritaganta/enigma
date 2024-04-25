@@ -34,10 +34,21 @@ def read_video(video_path, q3d=False, optical_flow=False):
                 frame = preprocess(current_frame)
                 cnts = contouring(frame)
                 line_frame = fit_curve(frame, cnts)
+                
+
                 try:
+                    corners = detect_corners(frame)
+                    for i in corners:
+                        x,y = i.ravel()
+                        cv2.circle(line_frame,(x,y),3,(30, 255, 255),-1)
+
                     cv2.imshow('Contour Overlay', line_frame)
                 except:
                     pass
+
+
+
+
 
             if optical_flow:
                 if prev_frame is not None:
@@ -130,6 +141,22 @@ def fit_curve(frame, cnts):
             cv2.circle(line_frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
 
         return line_frame
+    
+
+def detect_corners(frame):
+
+    corners = cv2.goodFeaturesToTrack(frame,25,0.01,10)
+    corners = np.int0(corners)
+
+    return corners
+
+
+
+
+
+
+
+
 
 class Opticalflow:
     def draw_flow(rgb_prev, rgb_nxt, viz=False):
