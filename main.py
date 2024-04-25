@@ -33,11 +33,20 @@ def read_video(video_path, q3d=False, optical_flow=False):
             if q3d:
                 frame = preprocess(current_frame)
                 cnts = contouring(frame)
-                line_frame = fit_curve(frame, cnts)
+                line = fit_curve(frame, cnts)
+                corners = detect_corners(frame)
+                width = dist_calc(corners)
+                
                 
 
                 try:
-                    corners = detect_corners(frame)
+
+                    line_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+
+                    for point in line:
+                        x, y = point
+                        cv2.circle(line_frame, (int(x), int(y)),1,(255,0,255), 1)
+
                     for i in corners:
                         x,y = i.ravel()
                         cv2.circle(line_frame,(x,y),3,(30, 255, 255),-1)
@@ -113,8 +122,8 @@ def fit_curve(frame, cnts):
     if len(cnts)>0:
         cnt = cnts[0]
 
-        x_values =[]
-        y_values = []
+        x_values =[frame.shape[0]//2] # adding the image center point as well as an anchor
+        y_values = [frame.shape[1]//2]
         min_x = frame.shape[1]  # initialize the min and max x to the other end of the range
         max_x = 0
         for point in cnt:
@@ -136,19 +145,44 @@ def fit_curve(frame, cnts):
         x_line = np.arange(min_x + margin_x, max_x, 1)
         y_line = objective(x_line, a, b, c)
 
-        line_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
-        for i in range((x_line.shape[0])):
-            cv2.circle(line_frame, (int(x_line[i]), int(y_line[i])),1,(255,0,255), 1)
+        line = np.stack((x_line, y_line), axis=1)
 
-        return line_frame
+        return line
     
 
 def detect_corners(frame):
 
-    corners = cv2.goodFeaturesToTrack(frame,25,0.01,10)
-    corners = np.int0(corners)
+    try:
 
-    return corners
+        corners = cv2.goodFeaturesToTrack(frame,25,0.01,10)
+        corners = np.int0(corners)
+
+        return corners
+    
+    except:
+        print("unable to load frame")
+        pass
+
+
+def closest_node(node, nodes):
+    dist2 = np.linalg.norm(nodes - node, axis=1)
+    #dist_2 = np.sum((nodes - node)**2, axis = 1)
+    return np.argmin(dist2)
+
+
+def dist_calc(corners):
+    try: 
+        north = corners[0][0]
+        south = corners[1][0]
+        return np.linalg.norm(north - south)
+    
+    except:
+        print("unable to load corners")
+        pass
+
+
+
+
 
 
 
