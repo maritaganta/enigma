@@ -171,6 +171,9 @@ def closest_node(node, nodes):
 
 
 def dist_calc(corners):
+
+    # TODO: Remove the hardcoding of the corner idx - used closest node function above, but didn't work...
+
     try: 
         north = corners[0][0]
         south = corners[1][0]
