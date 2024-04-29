@@ -32,9 +32,9 @@ def read_video(video_path, q3d=False, optical_flow=False):
 
             if q3d:
                 frame = preprocess(current_frame)
-                cnts = contouring(frame)
-                line = fit_curve(frame, cnts)
+                #cnts = contouring(frame)
                 corners = detect_corners(frame)
+                line = features_fit_curve(frame, corners)
                 width = dist_calc(corners)
                 
                 
@@ -50,10 +50,18 @@ def read_video(video_path, q3d=False, optical_flow=False):
                     for i in corners:
                         x,y = i.ravel()
                         cv2.circle(line_frame,(x,y),3,(30, 255, 255),-1)
+                    
+                    # IN CASE I NEED CONVEX
+                    # hull = cv2.convexHull(corners, False)
+                    # hulls = [hull]
+                    # cv2.drawContours(line_frame, hulls, 0, (200,0,200), 1, 8)
 
                     cv2.imshow('Contour Overlay', line_frame)
-                except:
-                    pass
+
+                except Exception as e: 
+                    print(e)
+                    #pass
+                    
 
 
 
@@ -117,7 +125,43 @@ def objective(x, a, b, c):
     # https://machinelearningmastery.com/curve-fitting-with-python/
     return a * x + b * x**2 + c
 
-def fit_curve(frame, cnts):
+def features_fit_curve(frame, corners):
+
+    try:
+
+        x_values =[frame.shape[0]//2] # adding the image center point as well as an anchor
+        y_values = [frame.shape[1]//2]
+        min_x = frame.shape[1]  # initialize the min and max x to the other end of the range
+        max_x = 0
+        for i in corners:
+            x,y = i.ravel()
+            if x < min_x:
+                min_x = x # min x value in the frame
+            if x > max_x:
+                max_x = x # max x value in the frame
+            if x != 0 and y !=0 and x!=479 and y!=479: # TODO: improve into ranges to not get x/y values close to the edges
+                x_values.append(x)
+                y_values.append(y)
+
+        popt, _ = curve_fit(objective, x_values, y_values)
+        a, b, c = popt
+
+        margin_x = 0 # adjust according to how further from min x do we start fitting - useful in the case of long curves 
+
+        x_line = np.arange(min_x + margin_x, max_x, 1)
+        y_line = objective(x_line, a, b, c)
+
+        line = np.stack((x_line, y_line), axis=1)
+
+        return line
+    
+    except Exception as e:
+        print("Waiting for features...")
+        print(e)
+        pass
+    
+
+def contour_fit_curve(frame, cnts):
 
     if len(cnts)>0:
         cnt = cnts[0]
@@ -134,8 +178,8 @@ def fit_curve(frame, cnts):
             if x > max_x:
                 max_x = x # max x value in the frame
             if x != 0 and y !=0 and x!=479 and y!=479: # TODO: improve into ranges to not get x/y values close to the edges
-                x_values.append(point[0][0])
-                y_values.append(point[0][1])
+                x_values.append(x)
+                y_values.append(y)
 
         popt, _ = curve_fit(objective, x_values, y_values)
         a, b, c = popt
@@ -153,14 +197,14 @@ def fit_curve(frame, cnts):
 def detect_corners(frame):
 
     try:
-
-        corners = cv2.goodFeaturesToTrack(frame,25,0.01,10)
+        corners = cv2.goodFeaturesToTrack(frame,50,0.01,10) # TODO: Experiment with how many corners and min distances I need
         corners = np.int0(corners)
+
 
         return corners
     
     except:
-        print("unable to load frame")
+        print("Waiting for frame...")
         pass
 
 
