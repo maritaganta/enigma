@@ -4,7 +4,6 @@ from scipy.optimize import curve_fit
 from sklearn.cluster import DBSCAN
 
 
-
 video_path = 'data/sinusoidal_move_phase.mp4'
 
 def read_video(video_path, q3d=False, optical_flow=False):
@@ -41,7 +40,25 @@ def read_video(video_path, q3d=False, optical_flow=False):
                     x_line = generate_x_line(min_x, max_x)
                     line = line_calculation(x_line, a, b, c)
 
-                    width = dist_calc(corners)
+
+                    # Center point work
+                    centerX =frame.shape[0]//2 
+                    centerY = frame.shape[1]//2     # TODO: I can get curve's error by comparing centerY w/ actual curve value of curve X.
+                                                    # TODO: We can estimate accuracy from abs(center_curve_value[1]-centerY)
+
+                    center_curve_value = line_calculation(centerX, a, b, c)
+
+                    center_slope = get_slope(centerX, a, b, c)
+
+
+                    test = testing(frame, center_slope)
+
+
+                    #width = dist_calc(frame, corners)
+
+
+
+
 
                     line_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
 
@@ -122,7 +139,7 @@ def contouring(frame, ellipse=False):
     return contours
 
 
-def objective(x, a, b, c):
+def objective(x, a, b, c):              # TODO: At some point, create polynomial function that works with coefficients
     # TODO: Evaluate performance of each line
     # https://machinelearningmastery.com/curve-fitting-with-python/
     return a * x + b * x**2 + c
@@ -152,7 +169,6 @@ def features_fit_curve(frame, corners):
         return min_x, max_x, a, b, c
     
     except Exception as e:
-        print("Waiting for features...")
         print(e)
         pass
 
@@ -164,13 +180,27 @@ def generate_x_line(min_x, max_x):
 
     return x_line
 
-def line_calculation(x, a, b, c):
+def line_calculation(x, a, b, c): # TODO: Very bad exception handling here. Tries for arrays and excepts for points without any check
     
     y = objective(x, a, b, c)
 
-    line = np.stack((x, y), axis=1)
+    try:
 
-    return line  
+        line = np.stack((x, y), axis=1)
+        return line  
+    
+    except:
+
+        return (x,y)
+
+def get_slope(x, a, b, c):
+    
+    coeffs = np.polyder([b,a,c]) # rearranged for coeeficient and power matching
+
+    slope = sum(coef * x**i for i, coef in enumerate(coeffs[::-1]))
+    
+    return slope
+
 
 def contour_fit_curve(frame, cnts):
 
@@ -225,20 +255,65 @@ def closest_node(node, nodes):
     return np.argmin(dist2)
 
 
-def dist_calc(corners):
+def dist_calc(frame, corners):
 
-    # TODO: Remove the hardcoding of the corner idx - used closest node function above, but didn't work...
-
+    image_center = (frame.shape[1] / 2, frame.shape[0] / 2)
+    
     try: 
-        north = corners[0][0]
-        south = corners[1][0]
-        return np.linalg.norm(north - south)
+        # TODO: Remove the hardcoding of the corner idx - used closest node function above, but didn't work...
+        # north = corners[0][0]
+        # south = corners[1][0]
+        # return np.linalg.norm(north - south)
+
+        distances = [np.linalg.norm(np.subtract(corner, image_center)) for corner in corners]
+
+        # Find the indices of the two corners closest to the image center
+        sorted_indices = sorted(range(len(distances)), key=lambda i: distances[i])
+        closest_indices = sorted_indices[:4]
+
+        # Get the coordinates of the two closest corners
+        closest_corners = [tuple(corners[i][0]) for i in closest_indices]
+
+        test = frame.copy()
+        test = cv2.cvtColor(test, cv2.COLOR_GRAY2RGB)
+        for point in closest_corners:
+            x, y = point
+            cv2.circle(test, (int(x), int(y)),1,(255,0,255), 5)
+
+        
+
     
     except:
         print("unable to load corners")
         pass
 
+def rotate_image(image, center, angle):
+    # Get the rotation matrix
+    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+    
+    # Perform the rotation
+    rotated_image = cv2.warpAffine(image, rotation_matrix, (image.shape[1], image.shape[0]))
+    
+    return rotated_image
 
+
+def testing(frame, slope):
+
+    try:
+        image = frame.copy()
+
+        center = (image.shape[1] // 2, image.shape[0] // 2)
+
+        # Calculate the slope angle in radians
+        slope = np.degrees(slope)
+
+
+        rotated_image = rotate_image(image, center, slope)
+            
+        cv2.imshow("Testing", rotated_image)
+
+    except Exception as e:
+        print(e)
 
 
 
