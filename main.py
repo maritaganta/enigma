@@ -34,12 +34,14 @@ def read_video(video_path, q3d=False, optical_flow=False):
                 frame = preprocess(current_frame)
                 #cnts = contouring(frame)
                 corners = detect_corners(frame)
-                line = features_fit_curve(frame, corners)
-                width = dist_calc(corners)
-                
-                
 
                 try:
+
+                    min_x, max_x, a, b, c = features_fit_curve(frame, corners)
+                    x_line = generate_x_line(min_x, max_x)
+                    line = line_calculation(x_line, a, b, c)
+
+                    width = dist_calc(corners)
 
                     line_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
 
@@ -125,6 +127,7 @@ def objective(x, a, b, c):
     # https://machinelearningmastery.com/curve-fitting-with-python/
     return a * x + b * x**2 + c
 
+
 def features_fit_curve(frame, corners):
 
     try:
@@ -146,20 +149,28 @@ def features_fit_curve(frame, corners):
         popt, _ = curve_fit(objective, x_values, y_values)
         a, b, c = popt
 
-        margin_x = 0 # adjust according to how further from min x do we start fitting - useful in the case of long curves 
-
-        x_line = np.arange(min_x + margin_x, max_x, 1)
-        y_line = objective(x_line, a, b, c)
-
-        line = np.stack((x_line, y_line), axis=1)
-
-        return line
+        return min_x, max_x, a, b, c
     
     except Exception as e:
         print("Waiting for features...")
         print(e)
         pass
+
+def generate_x_line(min_x, max_x):
+
+    margin_x = 0 # adjust according to how further from min x do we start fitting - useful in the case of long curves 
+
+    x_line = np.arange(min_x + margin_x, max_x, 1)
+
+    return x_line
+
+def line_calculation(x, a, b, c):
     
+    y = objective(x, a, b, c)
+
+    line = np.stack((x, y), axis=1)
+
+    return line  
 
 def contour_fit_curve(frame, cnts):
 
