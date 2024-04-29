@@ -50,11 +50,9 @@ def read_video(video_path, q3d=False, optical_flow=False):
 
                     center_slope = get_slope(centerX, a, b, c)
 
+                    rotated = rotating(frame, center_slope)
 
-                    test = testing(frame, center_slope)
-
-
-                    #width = dist_calc(frame, corners)
+                    width = testing(frame, corners)
 
 
 
@@ -181,19 +179,16 @@ def generate_x_line(min_x, max_x):
     return x_line
 
 def line_calculation(x, a, b, c): # TODO: Very bad exception handling here. Tries for arrays and excepts for points without any check
-    
     y = objective(x, a, b, c)
-
     try:
-
         line = np.stack((x, y), axis=1)
         return line  
-    
     except:
-
         return (x,y)
 
 def get_slope(x, a, b, c):
+
+    # TODO: MOdulate slope calculation according to correct orientation and frame
     
     coeffs = np.polyder([b,a,c]) # rearranged for coeeficient and power matching
 
@@ -240,8 +235,6 @@ def detect_corners(frame):
     try:
         corners = cv2.goodFeaturesToTrack(frame,50,0.01,10) # TODO: Experiment with how many corners and min distances I need
         corners = np.int0(corners)
-
-
         return corners
     
     except:
@@ -255,9 +248,9 @@ def closest_node(node, nodes):
     return np.argmin(dist2)
 
 
-def dist_calc(frame, corners):
+def testing(frame, corners):
 
-    image_center = (frame.shape[1] / 2, frame.shape[0] / 2)
+    image_center = (frame.shape[1] // 2, frame.shape[0] // 2)
     
     try: 
         # TODO: Remove the hardcoding of the corner idx - used closest node function above, but didn't work...
@@ -279,43 +272,26 @@ def dist_calc(frame, corners):
         for point in closest_corners:
             x, y = point
             cv2.circle(test, (int(x), int(y)),1,(255,0,255), 5)
+        cv2.imshow("More testing...", test)
 
-        
-
-    
     except:
         print("unable to load corners")
         pass
 
-def rotate_image(image, center, angle):
-    # Get the rotation matrix
-    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-    
-    # Perform the rotation
-    rotated_image = cv2.warpAffine(image, rotation_matrix, (image.shape[1], image.shape[0]))
-    
-    return rotated_image
 
-
-def testing(frame, slope):
+def rotating(frame, slope):
 
     try:
         image = frame.copy()
-
         center = (image.shape[1] // 2, image.shape[0] // 2)
-
-        # Calculate the slope angle in radians
-        slope = np.degrees(slope)
-
-
-        rotated_image = rotate_image(image, center, slope)
-            
+        rotation_matrix = cv2.getRotationMatrix2D(center, np.degrees(slope), 1.0)
+        rotated_image = cv2.warpAffine(image, rotation_matrix, (image.shape[1], image.shape[0]))
         cv2.imshow("Testing", rotated_image)
+
+        return rotated_image
 
     except Exception as e:
         print(e)
-
-
 
 
 
