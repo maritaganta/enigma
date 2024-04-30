@@ -5,7 +5,7 @@ from sklearn.cluster import DBSCAN
 
 video_path = 'data/sinusoidal_move_phase.mp4'
 
-viz = False
+viz = True
 
 def read_video(video_path, viz=False, q3d=False, optical_flow=False):
     
@@ -44,12 +44,21 @@ def read_video(video_path, viz=False, q3d=False, optical_flow=False):
                     slope = get_slope(line)
                     rotated = rotating(frame, slope)
 
-                    image = frame.copy()
-                    image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)                    
-                    cv2.imshow("Rotation", rotated)
+
+                    lengths = []
+
+                    for i in range(-2, 4, 2):  # TODO: Define how many verticals shall be taken, at the moment I have 3 with a step of 2
+                        vertical = define_verticals(rotated, step=0)
+                        first_idx, last_idx = intersection_points(vertical)
+                        length = calc_lengths(first_idx, last_idx)
+
+                        lengths.append(length)
+
+                    width = sum(lengths) / len(lengths) # TODO: Create an if-block where the width is checked for within accuracy
+
+                    print(width)  
 
 
-                    #width = testing(frame, corners)
 
                     if viz:
                         line_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
@@ -63,6 +72,9 @@ def read_video(video_path, viz=False, q3d=False, optical_flow=False):
                             cv2.circle(line_frame,(x,y),1,(30, 255, 255),3)
 
                         cv2.imshow('Visualisation', line_frame)
+
+                        image = cv2.cvtColor(rotated, cv2.COLOR_GRAY2RGB)
+                        cv2.imshow("Rotation", image)
 
                 except Exception as e: 
                     print(e)
@@ -159,33 +171,33 @@ def features_fit_curve(frame, corners):
         print(e)
         pass
 
+
 def generate_x_line(min_x, max_x, predict=True):
 
     margin_x = 0 # adjust according to how further from min x do we start fitting - useful in the case of long curves 
 
     if predict:
-        predict_x = 1
+        predict_x = 1 # projecting the line for as many points further
 
     else:
-        predict_x = 0
+        predict_x = 0 
 
     x_line = np.arange(min_x + margin_x, max_x+predict_x, 1)
 
     return x_line
+
 
 def line_calculation(x, a, b, c): # TODO: Very bad exception handling here. Tries for arrays and excepts for points without any check
     y = objective(x, a, b, c)
     try:
         line = np.stack((x, y), axis=1)
         return line  
-    except: # TODO: Looks like I will not be needing this, but great if we could have it encoded nicely
+    
+    except: # TODO: Looks like I will not be needing this, but great if we could have it encoded nicely. It could be useful when calculating the errors
         return (x,y)
 
-def get_slope(line, step=2):
 
-    # TODO: Modulate slope calculation according to correct orientation and frame - LEAVE IT FOR LATER
-    # coeffs = np.polyder([b,a,c]) # rearranged for coeeficient and power matching
-    # slope = sum(coef * x**i for i, coef in enumerate(coeffs[::-1]))
+def get_slope(line, step=2): # The step refers to how far in the past are we looking for the slope
 
     point1 = line[-1]
     point2 = line[-1-step]
@@ -193,45 +205,23 @@ def get_slope(line, step=2):
     delta_y = point2[1] - point1[1]
     delta_x = point2[0] - point1[0]
 
-    # Avoid division by zero
-
-    slope = np.arctan2(delta_y, delta_x)
+    slope = np.arctan2(delta_y, delta_x) # TODO: Account for 0 division - check if arctan documentation does it already 
 
     return slope
 
 
-def contour_fit_curve(frame, cnts):
+def rotating(frame, slope):
 
-    if len(cnts)>0:
-        cnt = cnts[0]
+    try:
+        center = (frame.shape[1] // 2, frame.shape[0] // 2)
+        rotation_matrix = cv2.getRotationMatrix2D(center, np.degrees(slope), 1.0)
+        rotated_image = cv2.warpAffine(frame, rotation_matrix, (frame.shape[1], frame.shape[0]))   
 
-        x_values =[frame.shape[0]//2] # adding the image center point as well as an anchor
-        y_values = [frame.shape[1]//2]
-        min_x = frame.shape[1]  # initialize the min and max x to the other end of the range
-        max_x = 0
-        for point in cnt:
-            x = point[0][0]
-            y = point[0][1]
-            if x < min_x:
-                min_x = x # min x value in the frame
-            if x > max_x:
-                max_x = x # max x value in the frame
-            if x != 0 and y !=0 and x!=479 and y!=479: # TODO: improve into ranges to not get x/y values close to the edges
-                x_values.append(x)
-                y_values.append(y)
+        return rotated_image
 
-        popt, _ = curve_fit(objective, x_values, y_values)
-        a, b, c = popt
+    except Exception as e:
+        print(e)
 
-        margin_x = 0 # adjust according to how further from min x do we start fitting - useful in the case of long curves 
-
-        x_line = np.arange(min_x + margin_x, max_x, 1)
-        y_line = objective(x_line, a, b, c)
-
-        line = np.stack((x_line, y_line), axis=1)
-
-        return line
-    
 
 def detect_corners(frame):
 
@@ -249,6 +239,36 @@ def closest_node(node, nodes):
     dist2 = np.linalg.norm(nodes - node, axis=1)
     #dist_2 = np.sum((nodes - node)**2, axis = 1)
     return np.argmin(dist2)
+
+
+def define_verticals(frame, step=0):
+
+    vertical = frame[:, frame.shape[0]//2 + step]
+
+    return vertical
+
+
+def intersection_points(vertical):
+
+    non_zero_indices = np.nonzero(vertical)[0]
+
+    if len(non_zero_indices) == 0:
+        first = None
+        last = None
+    else:
+        first = non_zero_indices[0]
+        last = non_zero_indices[-1]
+        
+    return first, last
+
+def calc_lengths(first, last):
+
+    if first:
+        length = abs(first - last)
+    else:
+        length = 0
+
+    return length
 
 
 def testing(frame, corners):
@@ -292,20 +312,42 @@ def testing(frame, corners):
         pass
 
 
-def rotating(frame, slope):
-
-    try:
-        center = (frame.shape[1] // 2, frame.shape[0] // 2)
-        rotation_matrix = cv2.getRotationMatrix2D(center, np.degrees(slope), 1.0)
-        rotated_image = cv2.warpAffine(frame, rotation_matrix, (frame.shape[1], frame.shape[0]))   
-
-        return rotated_image
-
-    except Exception as e:
-        print(e)
 
 
 
+# Not in use - changed to features fit curve
+def contour_fit_curve(frame, cnts):
+
+    if len(cnts)>0:
+        cnt = cnts[0]
+
+        x_values =[frame.shape[0]//2] # adding the image center point as well as an anchor
+        y_values = [frame.shape[1]//2]
+        min_x = frame.shape[1]  # initialize the min and max x to the other end of the range
+        max_x = 0
+        for point in cnt:
+            x = point[0][0]
+            y = point[0][1]
+            if x < min_x:
+                min_x = x # min x value in the frame
+            if x > max_x:
+                max_x = x # max x value in the frame
+            if x != 0 and y !=0 and x!=479 and y!=479: # TODO: improve into ranges to not get x/y values close to the edges
+                x_values.append(x)
+                y_values.append(y)
+
+        popt, _ = curve_fit(objective, x_values, y_values)
+        a, b, c = popt
+
+        margin_x = 0 # adjust according to how further from min x do we start fitting - useful in the case of long curves 
+
+        x_line = np.arange(min_x + margin_x, max_x, 1)
+        y_line = objective(x_line, a, b, c)
+
+        line = np.stack((x_line, y_line), axis=1)
+
+        return line
+    
 
 
 
