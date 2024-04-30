@@ -3,10 +3,11 @@ import numpy as np
 from scipy.optimize import curve_fit
 from sklearn.cluster import DBSCAN
 
-
 video_path = 'data/sinusoidal_move_phase.mp4'
 
-def read_video(video_path, q3d=False, optical_flow=False):
+viz = False
+
+def read_video(video_path, viz=False, q3d=False, optical_flow=False):
     
     cap = cv2.VideoCapture(video_path)
 
@@ -31,53 +32,41 @@ def read_video(video_path, q3d=False, optical_flow=False):
 
             if q3d:
                 frame = preprocess(current_frame)
-                #cnts = contouring(frame)
+                #cnts = contouring(frame)           # TODO: Gigantic task --> Solve the convex contour problem // During testing on the robot
                 corners = detect_corners(frame)
 
                 try:
 
                     min_x, max_x, a, b, c = features_fit_curve(frame, corners)
                     x_line = generate_x_line(min_x, max_x)
-                    line = line_calculation(x_line, a, b, c)
+                    line = line_calculation(x_line, a, b, c)    # TODO: I can get curve's error by comparing centerY w/ actual curve value of curve X.
+                                                                # TODO: We can estimate accuracy from abs(center_curve_value[1]-centerY)
+                    slope = get_slope(line)
+                    rotated = rotating(frame, slope)
+
+                    image = frame.copy()
+                    image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)                    
+                    cv2.imshow("Rotation", rotated)
 
 
-                    # Center point work
-                    centerX =frame.shape[0]//2 
-                    centerY = frame.shape[1]//2     # TODO: I can get curve's error by comparing centerY w/ actual curve value of curve X.
-                                                    # TODO: We can estimate accuracy from abs(center_curve_value[1]-centerY)
+                    #width = testing(frame, corners)
 
-                    center_curve_value = line_calculation(centerX, a, b, c)
+                    if viz:
+                        line_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
 
-                    center_slope = get_slope(centerX, a, b, c)
+                        for point in line:
+                            x, y = point
+                            cv2.circle(line_frame, (int(x), int(y)),1,(255,0,255), 1)
 
-                    rotated = rotating(frame, center_slope)
+                        for i in corners:
+                            x,y = i.ravel()
+                            cv2.circle(line_frame,(x,y),1,(30, 255, 255),3)
 
-                    width = testing(frame, corners)
-
-
-
-
-
-                    line_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
-
-                    for point in line:
-                        x, y = point
-                        cv2.circle(line_frame, (int(x), int(y)),1,(255,0,255), 1)
-
-                    for i in corners:
-                        x,y = i.ravel()
-                        cv2.circle(line_frame,(x,y),3,(30, 255, 255),-1)
-                    
-                    # IN CASE I NEED CONVEX
-                    # hull = cv2.convexHull(corners, False)
-                    # hulls = [hull]
-                    # cv2.drawContours(line_frame, hulls, 0, (200,0,200), 1, 8)
-
-                    cv2.imshow('Contour Overlay', line_frame)
+                        cv2.imshow('Visualisation', line_frame)
 
                 except Exception as e: 
                     print(e)
-                    #pass
+
                     
 
 
@@ -170,11 +159,17 @@ def features_fit_curve(frame, corners):
         print(e)
         pass
 
-def generate_x_line(min_x, max_x):
+def generate_x_line(min_x, max_x, predict=True):
 
     margin_x = 0 # adjust according to how further from min x do we start fitting - useful in the case of long curves 
 
-    x_line = np.arange(min_x + margin_x, max_x, 1)
+    if predict:
+        predict_x = 1
+
+    else:
+        predict_x = 0
+
+    x_line = np.arange(min_x + margin_x, max_x+predict_x, 1)
 
     return x_line
 
@@ -183,17 +178,25 @@ def line_calculation(x, a, b, c): # TODO: Very bad exception handling here. Trie
     try:
         line = np.stack((x, y), axis=1)
         return line  
-    except:
+    except: # TODO: Looks like I will not be needing this, but great if we could have it encoded nicely
         return (x,y)
 
-def get_slope(x, a, b, c):
+def get_slope(line, step=2):
 
-    # TODO: MOdulate slope calculation according to correct orientation and frame
-    
-    coeffs = np.polyder([b,a,c]) # rearranged for coeeficient and power matching
+    # TODO: Modulate slope calculation according to correct orientation and frame - LEAVE IT FOR LATER
+    # coeffs = np.polyder([b,a,c]) # rearranged for coeeficient and power matching
+    # slope = sum(coef * x**i for i, coef in enumerate(coeffs[::-1]))
 
-    slope = sum(coef * x**i for i, coef in enumerate(coeffs[::-1]))
-    
+    point1 = line[-1]
+    point2 = line[-1-step]
+
+    delta_y = point2[1] - point1[1]
+    delta_x = point2[0] - point1[0]
+
+    # Avoid division by zero
+
+    slope = np.arctan2(delta_y, delta_x)
+
     return slope
 
 
@@ -250,6 +253,8 @@ def closest_node(node, nodes):
 
 def testing(frame, corners):
 
+    # TODO: This function doesn't really do anything at the moment - just playground
+
     image_center = (frame.shape[1] // 2, frame.shape[0] // 2)
     
     try: 
@@ -272,7 +277,15 @@ def testing(frame, corners):
         for point in closest_corners:
             x, y = point
             cv2.circle(test, (int(x), int(y)),1,(255,0,255), 5)
+
+        # IN CASE I NEED CONVEX
+        # hull = cv2.convexHull(corners, False)
+        # hulls = [hull]
+        # cv2.drawContours(test, hulls, 0, (200,0,200), 1, 8)
+
         cv2.imshow("More testing...", test)
+
+        
 
     except:
         print("unable to load corners")
@@ -282,11 +295,9 @@ def testing(frame, corners):
 def rotating(frame, slope):
 
     try:
-        image = frame.copy()
-        center = (image.shape[1] // 2, image.shape[0] // 2)
+        center = (frame.shape[1] // 2, frame.shape[0] // 2)
         rotation_matrix = cv2.getRotationMatrix2D(center, np.degrees(slope), 1.0)
-        rotated_image = cv2.warpAffine(image, rotation_matrix, (image.shape[1], image.shape[0]))
-        cv2.imshow("Testing", rotated_image)
+        rotated_image = cv2.warpAffine(frame, rotation_matrix, (frame.shape[1], frame.shape[0]))   
 
         return rotated_image
 
@@ -412,7 +423,7 @@ def measure_width(move, core_flow, rgb_prev, viz=False):
     return np.zeros_like(rgb_prev), None
 
 
-read_video(video_path, q3d=True, optical_flow=False)
+read_video(video_path, viz, q3d=True, optical_flow=False)
 
 
 
