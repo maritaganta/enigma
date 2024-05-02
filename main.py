@@ -5,7 +5,7 @@ from sklearn.cluster import DBSCAN
 
 video_path = 'data/sinusoidal_move_phase.mp4'
 
-def read_video(video_path):
+def main():
     
     cap = cv2.VideoCapture(video_path)
 
@@ -257,7 +257,6 @@ def pipeline(frame, viz=False):
 
     
 
-read_video(video_path)
-
-
+if __name__ == "__main__":
+    main()
 
