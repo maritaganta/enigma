@@ -5,9 +5,12 @@ from sklearn.cluster import DBSCAN
 
 video_path = 'data/sinusoidal_move_phase.mp4'
 
-def main():
+def read_video(video_path):
     
     cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    timestamps = [cap.get(cv2.CAP_PROP_POS_MSEC)]
 
     if not cap.isOpened():
         print("ERROR: Could not open video")
@@ -17,7 +20,9 @@ def main():
         ret, frame = cap.read()
         if ret:
 
-            corners, line, rotated, width = pipeline(frame, viz=True)
+            timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+
+            cnts, corners, line, rotated, width = pipeline(frame, viz=True)
                 
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 break
@@ -27,6 +32,7 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
+
 
 
 def preprocess(frame, size=(480,480)):
@@ -139,7 +145,7 @@ def get_slope(line, step=1): # The step refers to how far in the past are we loo
     return slope
 
 
-def rotating(frame, slope):
+def rotating(frame, slope): # TODO: Add anti-rotation for the width vector
 
     try:
         center = (frame.shape[1] // 2, frame.shape[0] // 2)
@@ -251,12 +257,8 @@ def pipeline(frame, viz=False):
         rotated = None
         width = 0
 
-    return corners, line, rotated, width
+    return cnts, corners, line, rotated, width
 
 
-
-    
-
-if __name__ == "__main__":
-    main()
+# read_video(video_path)
 
