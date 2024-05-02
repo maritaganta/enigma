@@ -5,7 +5,7 @@ from sklearn.cluster import DBSCAN
 
 video_path = 'data/sinusoidal_move_phase.mp4'
 
-viz = True
+viz = False
 
 def read_video(video_path, viz=False, q3d=False, optical_flow=False):
     
@@ -79,17 +79,7 @@ def read_video(video_path, viz=False, q3d=False, optical_flow=False):
                 except Exception as e: 
                     print(e)
 
-                    
-
-
-
-
-
-            if optical_flow:
-                if prev_frame is not None:
-                    flow_img, move, core_flow = Opticalflow.analyse(prev_frame, current_frame)
-                    width_rgb, width = measure_width(move, core_flow, prev_frame)
-
+                
 
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 break
