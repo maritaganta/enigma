@@ -1,37 +1,51 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-from sklearn.cluster import DBSCAN
 
 video_path = 'data/sinusoidal_move_phase.mp4'
 
 def read_video(video_path):
     
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
 
     timestamps = [cap.get(cv2.CAP_PROP_POS_MSEC)]
+    widths = [0]
 
     if not cap.isOpened():
         print("ERROR: Could not open video")
         return
     
     while cap.isOpened():
+
         ret, frame = cap.read()
-        if ret:
 
-            timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
-
-            cnts, corners, line, rotated, width = pipeline(frame, viz=True)
-                
-            if cv2.waitKey(25) & 0xFF == ord('q'):
-                break
-        
-        else:
+        if not ret:
             break
+
+        # TODO: Here is the CVSW logic and it returns all relevant params. They can be used for further viz or other
+        cnts, corners, line, rotated, width = pipeline(frame, viz=True)
+
+        timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+        widths.append(width)
+
+        if cv2.waitKey(25) & 0xFF == ord('q'):
+            break
+        
 
     cap.release()
     cv2.destroyAllWindows()
+
+    plt.plot(timestamps, widths)
+    plt.xlabel('Time (ms)')
+    plt.ylabel('Width (px)')
+    plt.title('Layer Width Over Time')
+
+    # Show the plot
+    plt.savefig('./plot.png')
+
+    # Close the plot
+    plt.close()
 
 
 
@@ -260,5 +274,5 @@ def pipeline(frame, viz=False):
     return cnts, corners, line, rotated, width
 
 
-# read_video(video_path)
+read_video(video_path)
 
