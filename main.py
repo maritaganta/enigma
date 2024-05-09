@@ -154,7 +154,8 @@ def get_slope(line, step=1): # The step refers to how far in the past are we loo
     delta_y = point2[1] - point1[1]
     delta_x = point2[0] - point1[0]
 
-    slope = np.arctan2(delta_y, delta_x) # TODO: Account for 0 division - check if arctan documentation does it already 
+    slope = np.arctan2(delta_y, delta_x) # TODO: Account for 0 division - check if arctan2 documentation does it already 
+                                         # TODO: arctan() vs arctan2(): arctan does not work at all..check further what's the difference with the range 'cause I don't get it
 
     return slope
 
@@ -239,7 +240,7 @@ def pipeline(frame, viz=False):
 
         lengths = []
         for i in range(-2, 4, 2):  # TODO: Define how many verticals shall be taken, at the moment I have 3 with a step of 2
-            vertical = define_verticals(rotated, step=0)
+            vertical = define_verticals(rotated, step=i)
             first_idx, last_idx = intersection_points(vertical)
             length = calc_lengths(first_idx, last_idx)
             lengths.append(length)
@@ -259,9 +260,22 @@ def pipeline(frame, viz=False):
                 x,y = i.ravel()
                 cv2.circle(line_frame,(x,y),1,(30, 255, 255),3)
 
+            h, w = rotated.shape
+
+            center_x = w // 2
+            center_y = h // 2
+            size = 50
+            top_left_x = center_x - size // 2
+            top_left_y = center_y - size // 2
+            bottom_right_x = center_x + size // 2
+            bottom_right_y = center_y + size // 2
+
+            part = rotated[top_left_y:bottom_right_y, top_left_x:bottom_right_x].copy() # TODO: plot the line
+
             cv2.imshow('Playback Video', frame)
             cv2.imshow('Visualisation', line_frame)
             cv2.imshow("Rotation", rotated)
+            cv2.imshow("Adequately close", part)
 
             print(width)
 
