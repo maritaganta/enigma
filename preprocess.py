@@ -48,7 +48,7 @@ def testing(frame, center):
 
     copy = isolate_area(frame)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15,15))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25,25))
     copy = cv2.morphologyEx(copy, cv2.MORPH_CLOSE, kernel)
 
     contours, _ = cv2.findContours(copy, 
@@ -77,9 +77,34 @@ def testing(frame, center):
         endx = 600 * np.cos(theta) + center[0] 
         endy = 600 * np.sin(theta) + center[1]
 
-        cv2.line(new,(center),(int(endx),int(endy)),(255,0,0),2)
+        start_point = center
+        end_point = (int(endx),int(endy))
+
+        length = 50
+
+        cv2.line(new,start_point,end_point,(255,0,0),2)
+
+        dx = end_point[0] - start_point[0]
+        dy = end_point[1] - start_point[1]
+
+        # Calculate the perpendicular direction vector
+        perp_dx = -dy
+        perp_dy = dx
+
+        # Normalize the perpendicular direction vector
+        magnitude = np.sqrt(perp_dx**2 + perp_dy**2)
+        perp_dx /= magnitude
+        perp_dy /= magnitude
+
+        # Calculate both end points of the perpendicular line
+        perp_end_point1 = (int(start_point[0] + perp_dx * length), int(start_point[1] + perp_dy * length))
+        perp_end_point2 = (int(start_point[0] - perp_dx * length), int(start_point[1] - perp_dy * length))
+
+        # Draw the perpendicular line
+        cv2.line(new, perp_end_point1, perp_end_point2, (0, 255, 0), 2)
 
     cv2.imshow('Processed', new)
+
 
     return frame
 
@@ -128,6 +153,7 @@ def isolate_area(frame):
     copy[top_left_y:bottom_right_y, top_left_x:bottom_right_x] = frame[top_left_y:bottom_right_y, top_left_x:bottom_right_x]
 
     return copy
+
 
 
 read_video(video_path)
