@@ -69,7 +69,7 @@ def testing(frame, center):
         epsilon = 0.02*cv2.arcLength(contours[-1],True)
         approx = cv2.approxPolyDP(contours[-1],epsilon,True)
 
-        cv2.drawContours(new,[approx],-1,(0,255,0),2)
+        #cv2.drawContours(new,[approx],-1,(0,255,0),2)
 
         M = cv2.moments(approx)
         center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
@@ -82,31 +82,86 @@ def testing(frame, center):
 
         length = 50
 
-        cv2.line(new,start_point,end_point,(255,0,0),2)
+        #cv2.line(new,start_point,end_point,(255,0,0),2)
 
         dx = end_point[0] - start_point[0]
         dy = end_point[1] - start_point[1]
 
-        # Calculate the perpendicular direction vector
         perp_dx = -dy
         perp_dy = dx
 
-        # Normalize the perpendicular direction vector
         magnitude = np.sqrt(perp_dx**2 + perp_dy**2)
         perp_dx /= magnitude
         perp_dy /= magnitude
 
-        # Calculate both end points of the perpendicular line
         perp_end_point1 = (int(start_point[0] + perp_dx * length), int(start_point[1] + perp_dy * length))
         perp_end_point2 = (int(start_point[0] - perp_dx * length), int(start_point[1] - perp_dy * length))
 
-        # Draw the perpendicular line
-        cv2.line(new, perp_end_point1, perp_end_point2, (0, 255, 0), 2)
+        #cv2.line(new, perp_end_point1, perp_end_point2, (0, 255, 0), 2)
+
+        first_nonzero, last_nonzero = find_first_and_last_nonzero(copy, perp_end_point1, perp_end_point2)
+
+        cv2.circle(new, first_nonzero, 5, (0,0,255),3)
+        cv2.circle(new, last_nonzero, 5, (0,255,0),3)
+
+        cv2.line(new, first_nonzero, last_nonzero, (255, 0, 0), 2)
+
+        (x1,y1) = first_nonzero
+        (x2,y2) = last_nonzero
+
+        distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+        cv2.putText(new, f"{distance}", (100,100), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(30, 255, 255), thickness=1)
+
+
+
 
     cv2.imshow('Processed', new)
 
 
     return frame
+
+def bresenham_line(start, end):
+    """Generate points along a line using Bresenham's algorithm."""
+    x1, y1 = start
+    x2, y2 = end
+    points = []
+    dx = abs(x2 - x1)
+    dy = abs(y2 - y1)
+    sx = 1 if x1 < x2 else -1
+    sy = 1 if y1 < y2 else -1
+    err = dx - dy
+
+    while True:
+        points.append((x1, y1))
+        if x1 == x2 and y1 == y2:
+            break
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x1 += sx
+        if e2 < dx:
+            err += dx
+            y1 += sy
+
+    return points
+
+def find_first_and_last_nonzero(image, start_point, end_point):
+    points = bresenham_line(start_point, end_point)
+    
+    first_nonzero = None
+    last_nonzero = None
+    
+    for point in points:
+        x, y = point
+        if image[y, x] != 0:  # Check for non-zero pixel
+            if first_nonzero is None:
+                first_nonzero = (x, y)
+            last_nonzero = (x, y)
+    
+    return first_nonzero, last_nonzero
+
+
 
 def padding(frame, center):
 
