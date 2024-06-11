@@ -90,8 +90,9 @@ def contouring(frame, ellipse=False):
 def objective(x, a, b, c):              # TODO: At some point, create polynomial function that works with coefficients
     # TODO: Evaluate performance of each line
     # https://machinelearningmastery.com/curve-fitting-with-python/
-    return a * x + b * x**2 + c
-
+    #return a * x**3 + b * x**2 + c * x + 343
+    #return a * np.sin(b - x) + c * x**2 + 343
+    return a * x + b
 
 def features_fit_curve(frame, corners):
 
@@ -288,5 +289,5 @@ def pipeline(frame, viz=False):
     return cnts, corners, line, rotated, width
 
 
-read_video(video_path)
+#read_video(video_path)
 
