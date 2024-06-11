@@ -65,27 +65,11 @@ def testing(frame, center):
     if counter > 1:
         print("Generalisation Eror")
         # TODO: Boolean that discards timestamp
-    else:
-
-        corners = cv2.goodFeaturesToTrack(copy,50,0.6,20) # TODO: Experiment with how many corners and min distances I need
-        corners = np.intp(corners)
-        for i in corners:
-            x,y = i.ravel()
-            cv2.circle(new,(x,y),1,(255, 0, 0),3)
-        min_x, max_x, a, b, c = features_fit_curve(frame, corners)
-        x_line = generate_x_line(min_x, max_x)
-        line = line_calculation(x_line, a, b, c)
-
-        for point in line:
-            x, y = point
-            cv2.circle(new, (int(x), int(y)),1,(0,0,255), 1)
-
-                
-        epsilon = 0.01*cv2.arcLength(contours[-1],True)
+    else:                
+        epsilon = 0.02*cv2.arcLength(contours[-1],True)
         approx = cv2.approxPolyDP(contours[-1],epsilon,True)
-        print(approx)
 
-        cv2.drawContours(new,[approx],-1,(0,255,0),4)
+        cv2.drawContours(new,[approx],-1,(0,255,0),2)
 
         M = cv2.moments(approx)
         center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
@@ -93,11 +77,7 @@ def testing(frame, center):
         endx = 600 * np.cos(theta) + center[0] 
         endy = 600 * np.sin(theta) + center[1]
 
-        print(type(center), type((endx,endy)))
-        cv2.line(new,(center),(int(endx),int(endy)),(0,255,0),2)
-
-    
-    cv2.drawContours(new, contours, -1, (255, 0, 255), 1)
+        cv2.line(new,(center),(int(endx),int(endy)),(255,0,0),2)
 
     cv2.imshow('Processed', new)
 
